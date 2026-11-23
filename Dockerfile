@@ -3,16 +3,24 @@ RUN apk add --no-cache git make gcc musl-dev linux-headers
 RUN git clone https://github.com/amnezia-vpn/amneziawg-go.git && cd amneziawg-go && make && make install
 RUN git clone https://github.com/amnezia-vpn/amneziawg-tools.git && cd amneziawg-tools/src && make && make WITH_WGQUICK=yes install
 
-FROM alpine:3.19
+FROM alpine:3.24
 
 COPY --from=builder /usr/bin/amneziawg-go /usr/bin/amneziawg-go
 COPY --from=builder /usr/bin/awg /usr/bin/awg
 COPY --from=builder /usr/bin/awg-quick /usr/bin/awg-quick
 
+# Install the latest mainline nginx from the official nginx.org repository
+RUN apk add --no-cache curl ca-certificates \
+    && printf "@nginx https://nginx.org/packages/mainline/alpine/v%s/main\n" \
+        "$(grep -oE '^[0-9]+\.[0-9]+' /etc/alpine-release)" >> /etc/apk/repositories \
+    && curl -fsSL -o /etc/apk/keys/nginx_signing.rsa.pub https://nginx.org/keys/nginx_signing.rsa.pub \
+    && apk add --no-cache nginx@nginx \
+    && sed -i 's|/etc/nginx/conf.d/\*.conf|/etc/nginx/http.d/*.conf|' /etc/nginx/nginx.conf \
+    && rm -f /etc/nginx/conf.d/default.conf
+
 RUN apk update && apk add \
     python3 \
     py3-pip \
-    nginx \
     supervisor \
     curl \
     apache2-utils \
